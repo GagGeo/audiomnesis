@@ -1,7 +1,7 @@
 .DS_Store
-recordings/
-*.wav
-*.txt
-output/
 .venv/
 __pycache__/
+*.pyc
+recordings/
+output/
+models/
