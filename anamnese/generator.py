@@ -35,7 +35,7 @@ def generate_report(transcript, client, examples, patient_title,
     progress("Extraction des informations administratives")
     try:
         raw = client.generate(header_prompt(source), system=SYSTEM_PROMPT,
-                              num_predict=300)
+                              num_predict=1500)  # budget includes thinking tokens
         data = parse_json_reply(raw)
         result.header_fields = {k: data.get(k) for k in _HEADER_KEYS
                                 if data.get(k)}
@@ -62,7 +62,7 @@ def generate_report(transcript, client, examples, patient_title,
     try:
         result.intro_text = client.generate(
             intro_prompt(source, patient_title), system=SYSTEM_PROMPT,
-            num_predict=200)
+            num_predict=1200)  # budget includes thinking tokens
     except Exception:
         result.intro_text = ""
 

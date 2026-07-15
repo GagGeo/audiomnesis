@@ -39,7 +39,7 @@ class OllamaClient:
                 return
         raise OllamaError("Impossible de démarrer Ollama (ollama serve).")
 
-    def generate(self, prompt, system=None, num_predict=1500):
+    def generate(self, prompt, system=None, num_predict=3000):
         body = {
             "model": self.model,
             "prompt": prompt,
@@ -51,7 +51,10 @@ class OllamaClient:
         if system:
             body["system"] = system
         if self.model.startswith("qwen3"):
-            body["think"] = False
+            # This Ollama build cannot disable qwen3's thinking: think=False
+            # inlines the reasoning INTO the response text. think=True routes
+            # it to a separate "thinking" field, keeping "response" clean.
+            body["think"] = True
         req = urllib.request.Request(
             self.url + "/api/generate",
             data=json.dumps(body).encode(),
@@ -61,7 +64,7 @@ class OllamaClient:
                 data = json.loads(resp.read())
         except (urllib.error.URLError, OSError) as e:
             raise OllamaError(f"Échec de l'appel au modèle local : {e}") from e
-        return data.get("response", "").strip()
+        return strip_think(data.get("response", "")).strip()
 
 
     def unload(self):
@@ -78,6 +81,12 @@ class OllamaClient:
                 pass
         except (urllib.error.URLError, OSError):
             pass  # best effort: unloading must never break the pipeline
+
+
+def strip_think(text: str) -> str:
+    """Remove any inline <think>...</think> reasoning block (defensive)."""
+    import re
+    return re.sub(r"<think>.*?(</think>|\Z)", "", text, flags=re.DOTALL)
 
 
 def parse_json_reply(raw: str) -> dict:
