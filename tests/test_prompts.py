@@ -1,6 +1,17 @@
-from anamnese.prompts import (SYSTEM_PROMPT, section_prompt, intro_prompt,
-                              header_prompt, notes_prompt)
+from anamnese.prompts import (SYSTEM_PROMPT, STYLE_SKELETONS, section_prompt,
+                              intro_prompt, header_prompt, notes_prompt)
 from anamnese.sections import SECTIONS
+
+
+def test_skeletons_cover_all_sections_and_are_fact_free():
+    assert set(STYLE_SKELETONS) == {s.key for s in SECTIONS}
+    # no clinical fact from any real report may live in a skeleton
+    forbidden = ("burn-out", "cannabis", "TDAH", "Alzheimer", "hypertension",
+                 "harcèlement", "MDPH", "Ritaline")
+    for text in STYLE_SKELETONS.values():
+        assert "[" in text  # slots, not facts
+        for word in forbidden:
+            assert word.lower() not in text.lower()
 
 def test_system_prompt_bans_real_names():
     assert "XXX" in SYSTEM_PROMPT and "JAMAIS" in SYSTEM_PROMPT

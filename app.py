@@ -9,8 +9,8 @@ from tkinter import (Tk, Frame, Button, Label, Entry, Text, StringVar,
 
 from anamnese import config
 from anamnese.docx_filler import fill_report
-from anamnese.examples import extract_examples
 from anamnese.generator import generate_report
+from anamnese.prompts import STYLE_SKELETONS
 from anamnese.ollama_client import OllamaClient
 from anamnese.recorder import Recorder
 from anamnese.transcriber import to_whisper_wav, transcribe
@@ -176,9 +176,8 @@ class App:
             self.set_status("Démarrage du modèle local (Ollama)…")
             client = OllamaClient()
             client.ensure_running()
-            examples = extract_examples(config.STYLE_EXAMPLE_DOCX)
             try:
-                result = generate_report(text, client, examples, title,
+                result = generate_report(text, client, STYLE_SKELETONS, title,
                                          progress_cb=self.set_status)
             finally:
                 client.unload()  # free ~3 GB of RAM immediately

@@ -10,10 +10,12 @@ via un modèle de langage local (Ollama). **Aucune donnée ne quitte l'ordinateu
 ./install.sh
 ```
 
-**Exemple de style requis :** placez un compte-rendu complété et anonymisé au
-chemin `docs/bilan-cr_completed.docx`. L'application y lit vos formulations
-(sections anamnestiques) pour imiter votre style. Ce fichier reste local :
-il est exclu de git et ne doit jamais être publié.
+**Style de rédaction :** le style du clinicien (amorces « Spontanément, … »,
+conventions i.e./e.g., guillemets) est encodé sous forme de canevas sans aucun
+fait clinique dans `anamnese/prompts.py` (`STYLE_SKELETONS`). Aucun compte-rendu
+réel n'est nécessaire ni utilisé par l'application — c'est volontaire : un vrai
+compte-rendu dans le contexte du modèle risquait de faire fuir les faits d'un
+patient dans le rapport d'un autre.
 
 ## Utilisation
 

@@ -16,9 +16,66 @@ Si une information n'y figure pas, ne la mentionne pas.
 markdown, pas de commentaire, pas d'explication."""
 
 
+# Fact-free style skeletons distilled from the clinician's own reports.
+# Square brackets mark slots to fill FROM THE TRANSCRIPT ONLY — the skeletons
+# contain no clinical facts, so nothing can leak into a report.
+STYLE_SKELETONS = {
+    "plaintes": (
+        "Spontanément, Monsieur XXX mentionne en premier lieu des difficultés "
+        "[nature de la plainte principale]. Il explique en effet souvent "
+        "« [expression du patient] », [reformulation clinique]. Monsieur XXX "
+        "mentionne également des plaintes [autre sphère cognitive], avec "
+        "notamment [précision] (i.e., [terme clinique]).\n"
+        "Sur demande et interrogé sur la sphère [sphère], Monsieur XXX rapporte "
+        "[description] (e.g., [exemple concret rapporté par le patient]). "
+        "Précisant son mode de fonctionnement, il explique [description].\n"
+        "Enfin, interrogé sur sa consommation de substances psychoactives et/ou "
+        "addictives, Monsieur XXX explique [consommations rapportées, ou leur absence]."
+    ),
+    "atcd_perso": (
+        "Interrogé sur ses antécédents médicaux personnels, Monsieur XXX "
+        "[antécédents neurologiques rapportés, ou leur absence]. Il mentionne "
+        "[autres antécédents somatiques rapportés].\n"
+        "Sur le plan psychiatrique au sens large, Monsieur XXX rapporte "
+        "[antécédents psychiatriques rapportés, avec dates si mentionnées]."
+    ),
+    "atcd_fam": (
+        "Concernant ses antécédents familiaux, Monsieur XXX mentionne "
+        "[antécédent] chez [membre de la famille], [diagnostiqué ou suspecté]. "
+        "Il ne mentionne pas d'autres antécédents familiaux neurologiques et/ou "
+        "psychiatriques, diagnostiqués et/ou suspectés."
+    ),
+    "developpement": (
+        "Concernant son développement, Monsieur XXX [éléments concernant la "
+        "grossesse et la petite enfance, ou leur absence]. Enfant, Monsieur XXX "
+        "[apprentissages].\n"
+        "Durant sa scolarité, Monsieur XXX explique [description de la "
+        "scolarité] (e.g., [exemple rapporté]).\n"
+        "Sur le plan professionnel, Monsieur XXX [parcours et situation "
+        "professionnelle]."
+    ),
+    "thymie": (
+        "D'un point de vue thymique, Monsieur XXX rapporte un moral qu'il "
+        "qualifie de « [expression du patient] », [précisions].\n"
+        "Concernant son sommeil, Monsieur XXX [description du sommeil].\n"
+        "Sur le plan alimentaire, Monsieur XXX [description de l'appétit et de "
+        "l'alimentation]."
+    ),
+}
+
+
 def section_prompt(section, transcript, example, patient_title):
     stubs = " / ".join(f"« {s} »" for s in section.stubs)
-    return f"""Voici la transcription (ou les notes) d'un entretien d'anamnèse :
+    return f"""Voici le canevas de style de la section à rédiger. Les crochets \
+[…] indiquent le type d'information à y placer — le canevas ne contient aucun \
+fait : chaque fait doit provenir de la transcription.
+
+--- CANEVAS DE STYLE ---
+{example}
+--- FIN DU CANEVAS ---
+
+Voici la transcription (ou les notes) de l'entretien d'anamnèse de \
+{patient_title}. C'est la SEULE source d'information autorisée :
 
 --- TRANSCRIPTION ---
 {transcript}
@@ -26,14 +83,10 @@ def section_prompt(section, transcript, example, patient_title):
 
 Rédige la section « {section.heading} » du compte-rendu, concernant {patient_title}.
 Contenu attendu : {section.purpose}.
-Lorsque c'est naturel, commence tes paragraphes par les amorces suivantes : {stubs}.
-Sépare les paragraphes par un retour à la ligne.
-
-Exemple de style, issu d'un AUTRE patient — imite uniquement le style, ne reprends \
-aucun élément de son contenu :
---- EXEMPLE DE STYLE ---
-{example}
---- FIN DE L'EXEMPLE ---
+Suis la structure du canevas, en adaptant : si la transcription ne fournit rien \
+pour une phrase du canevas, omets cette phrase. N'ajoute JAMAIS un fait absent \
+de la transcription. Lorsque c'est naturel, commence tes paragraphes par les \
+amorces suivantes : {stubs}. Sépare les paragraphes par un retour à la ligne.
 
 Si la transcription ne contient aucune information pour cette section, réponds \
 exactement : AUCUNE INFORMATION."""
