@@ -12,9 +12,10 @@ WHISPER_MODEL = MODELS_DIR / "ggml-large-v3-turbo-q5_0.bin"
 WHISPER_BIN = "whisper-cli"  # from `brew install whisper-cpp`
 
 OLLAMA_URL = "http://127.0.0.1:11434"
-# qwen3:4b, not 8b: on this 8 GB machine the 8b model (5.2 GB weights + KV
-# cache) exhausts RAM and freezes macOS. 4b leaves comfortable headroom.
-OLLAMA_MODEL = "qwen3:4b"
+# gemma3:4b: small enough for this 8 GB machine (the 8b-class models freeze
+# macOS), and non-thinking — qwen3's reasoning mode cannot be disabled on
+# current Ollama builds and eats the whole token budget before answering.
+OLLAMA_MODEL = "gemma3:4b"
 OLLAMA_NUM_CTX = 8192
 OLLAMA_TIMEOUT = 900  # seconds per call; an 8 GB machine can be slow
 

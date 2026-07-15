@@ -10,6 +10,11 @@ via un modèle de langage local (Ollama). **Aucune donnée ne quitte l'ordinateu
 ./install.sh
 ```
 
+**Exemple de style requis :** placez un compte-rendu complété et anonymisé au
+chemin `docs/bilan-cr_completed.docx`. L'application y lit vos formulations
+(sections anamnestiques) pour imiter votre style. Ce fichier reste local :
+il est exclu de git et ne doit jamais être publié.
+
 ## Utilisation
 
 1. Double-cliquer sur `Anamnese.command`.
@@ -25,7 +30,7 @@ via un modèle de langage local (Ollama). **Aucune donnée ne quitte l'ordinateu
 ## Confidentialité
 
 - Transcription : whisper.cpp, processus local.
-- Rédaction : Ollama sur http://127.0.0.1:11434, modèle local `qwen3:4b`.
+- Rédaction : Ollama sur http://127.0.0.1:11434, modèle local `gemma3:4b`.
 - Fonctionne Wi-Fi coupé (test recommandé). Les enregistrements restent dans
   `recordings/` — pensez à les supprimer régulièrement.
 

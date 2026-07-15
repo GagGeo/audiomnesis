@@ -5,3 +5,6 @@ __pycache__/
 recordings/
 output/
 models/
+# clinical style examples stay local, never on GitHub
+docs/bilan-cr_completed.docx
+docs/bilan-cr_example.docx
