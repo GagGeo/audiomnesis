@@ -22,4 +22,8 @@ ollama list | grep -q "gemma3:4b" || ollama pull gemma3:4b
 echo "→ Tests"
 ./.venv/bin/pytest tests/ -q
 
-echo "✓ Installation terminée. Lancez l'application avec : Anamnese.command"
+echo "→ Application (compilation du lanceur + signature ad hoc)"
+clang -O2 -o Audiomnesis.app/Contents/MacOS/Audiomnesis app_src/launcher.c
+codesign --force --deep -s - Audiomnesis.app
+
+echo "✓ Installation terminée. Lancez l'application : Audiomnesis.app"

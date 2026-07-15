@@ -2,25 +2,27 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleName</key>
-	<string>Anamnese</string>
 	<key>CFBundleDisplayName</key>
-	<string>Anamnèse</string>
+	<string>Audiomnesis</string>
+	<key>CFBundleExecutable</key>
+	<string>Audiomnesis</string>
+	<key>CFBundleIconFile</key>
+	<string>Audiomnesis</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.gaggeo.audiomnesis</string>
-	<key>CFBundleVersion</key>
-	<string>1.0</string>
-	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<key>CFBundleName</key>
+	<string>Audiomnesis</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
-	<key>CFBundleExecutable</key>
-	<string>Anamnese</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1.0</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Anamnèse enregistre l'entretien clinique (avec le consentement du patient) pour le transcrire localement. Aucune donnée ne quitte cet ordinateur.</string>
+	<string>Audiomnesis enregistre l'entretien clinique (avec le consentement du patient) pour le transcrire localement. Aucune donnée ne quitte cet ordinateur.</string>
 </dict>
 </plist>

@@ -1,4 +1,4 @@
-# Anamnèse — transcription et pré-rédaction locales
+# Audiomnesis — transcription et pré-rédaction locales
 
 Outil 100 % local : enregistre l'entretien d'anamnèse, le transcrit (Whisper),
 et pré-rédige les sections anamnestiques du compte-rendu (`docs/bilan-cr.docx`)
@@ -19,9 +19,9 @@ patient dans le rapport d'un autre.
 
 ## Utilisation
 
-1. Double-cliquer sur **`Anamnese.app`** (l'application doit rester dans le
+1. Double-cliquer sur **`Audiomnesis.app`** (l'application doit rester dans le
    dossier du projet ; vous pouvez la glisser dans le Dock pour un accès rapide).
-   `Anamnese.command` reste disponible si vous préférez lancer depuis le Terminal.
+   `Audiomnesis.command` reste disponible si vous préférez lancer depuis le Terminal.
    Si l'app provient d'un téléchargement GitHub : clic droit → Ouvrir la
    première fois (application non signée).
 2. Choisir Monsieur/Madame, vérifier le modèle et le dossier de sortie.
