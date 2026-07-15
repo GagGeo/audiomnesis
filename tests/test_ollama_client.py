@@ -34,6 +34,19 @@ def test_think_flag_only_for_qwen3():
     assert "think" not in json.loads(fake.call_args[0][0].data)
 
 
+def test_unload_requests_zero_keep_alive_and_never_raises():
+    client = OllamaClient(model="qwen3:4b")
+    fake = _fake_urlopen({"done": True})
+    with mock.patch("anamnese.ollama_client.urllib.request.urlopen", fake):
+        client.unload()
+    body = json.loads(fake.call_args[0][0].data)
+    assert body["keep_alive"] == 0
+    # network failure must be swallowed
+    boom = mock.MagicMock(side_effect=OSError("down"))
+    with mock.patch("anamnese.ollama_client.urllib.request.urlopen", boom):
+        client.unload()  # no exception
+
+
 def test_parse_json_reply_strips_fences_and_noise():
     raw = "Voici :\n```json\n{\"a\": 1}\n```\nmerci"
     assert parse_json_reply(raw) == {"a": 1}

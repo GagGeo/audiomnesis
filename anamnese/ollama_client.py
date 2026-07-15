@@ -64,6 +64,22 @@ class OllamaClient:
         return data.get("response", "").strip()
 
 
+    def unload(self):
+        """Evict the model from RAM immediately (default keep-alive is 5 min,
+        which starves an 8 GB machine long after generation is done)."""
+        body = {"model": self.model, "prompt": "", "keep_alive": 0,
+                "stream": False}
+        req = urllib.request.Request(
+            self.url + "/api/generate",
+            data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=30):
+                pass
+        except (urllib.error.URLError, OSError):
+            pass  # best effort: unloading must never break the pipeline
+
+
 def parse_json_reply(raw: str) -> dict:
     """Extract the first JSON object from a possibly noisy model reply."""
     start, end = raw.find("{"), raw.rfind("}")

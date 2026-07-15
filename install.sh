@@ -16,8 +16,8 @@ MODEL=models/ggml-large-v3-turbo-q5_0.bin
 [ -f "$MODEL" ] || curl -L -o "$MODEL" \
   "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin"
 
-echo "→ Modèle de rédaction (Ollama qwen3:8b, ~5 Go, téléchargé une seule fois)"
-ollama list | grep -q "qwen3:8b" || ollama pull qwen3:8b
+echo "→ Modèle de rédaction (Ollama qwen3:4b, ~2,6 Go, téléchargé une seule fois)"
+ollama list | grep -q "qwen3:4b" || ollama pull qwen3:4b
 
 echo "→ Tests"
 ./.venv/bin/pytest tests/ -q

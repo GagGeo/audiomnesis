@@ -12,8 +12,10 @@ WHISPER_MODEL = MODELS_DIR / "ggml-large-v3-turbo-q5_0.bin"
 WHISPER_BIN = "whisper-cli"  # from `brew install whisper-cpp`
 
 OLLAMA_URL = "http://127.0.0.1:11434"
-OLLAMA_MODEL = "qwen3:8b"
-OLLAMA_NUM_CTX = 12288
+# qwen3:4b, not 8b: on this 8 GB machine the 8b model (5.2 GB weights + KV
+# cache) exhausts RAM and freezes macOS. 4b leaves comfortable headroom.
+OLLAMA_MODEL = "qwen3:4b"
+OLLAMA_NUM_CTX = 8192
 OLLAMA_TIMEOUT = 900  # seconds per call; an 8 GB machine can be slow
 
 SAMPLE_RATE = 16000  # whisper.cpp native input format
@@ -21,4 +23,4 @@ CHANNELS = 1
 
 # Transcripts longer than this (estimated tokens, ~3 chars/token in French)
 # are condensed to notes before section generation, to fit OLLAMA_NUM_CTX.
-CONDENSE_TOKEN_THRESHOLD = 7000
+CONDENSE_TOKEN_THRESHOLD = 4500

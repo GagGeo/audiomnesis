@@ -177,8 +177,11 @@ class App:
             client = OllamaClient()
             client.ensure_running()
             examples = extract_examples(config.STYLE_EXAMPLE_DOCX)
-            result = generate_report(text, client, examples, title,
-                                     progress_cb=self.set_status)
+            try:
+                result = generate_report(text, client, examples, title,
+                                         progress_cb=self.set_status)
+            finally:
+                client.unload()  # free ~3 GB of RAM immediately
             out_docx = outdir / f"CR_{stamp}.docx"
             fill_report(template, out_docx, result.intro_text,
                         result.section_texts, result.header_fields)
