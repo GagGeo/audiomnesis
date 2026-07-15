@@ -37,6 +37,8 @@ class App:
               font=("Helvetica", 16)).pack(side="left", padx=10)
         Button(top, text="Ouvrir un audio…",
                command=self.open_audio).pack(side="left", padx=10)
+        Button(top, text="Ouvrir un texte…",
+               command=self.open_text).pack(side="left")
         self.title_var = StringVar(value="Monsieur XXX")
         Radiobutton(top, text="Monsieur", variable=self.title_var,
                     value="Monsieur XXX").pack(side="left", padx=(20, 0))
@@ -63,6 +65,8 @@ class App:
               ).pack(anchor="w", padx=12)
         self.transcript = Text(root, wrap="word", height=18)
         self.transcript.pack(fill="both", expand=True, padx=12, pady=4)
+        # typing or pasting text directly must also unlock the Generate button
+        self.transcript.bind("<<Modified>>", self.on_text_modified)
 
         self.generate_btn = Button(root, text="Générer le compte-rendu",
                                    font=("Helvetica", 14, "bold"),
@@ -145,6 +149,23 @@ class App:
         if p:
             self.transcribe_file(Path(p), already_16k=False)
 
+    def open_text(self):
+        """Third input mode: an existing transcript/notes text file."""
+        p = filedialog.askopenfilename(
+            filetypes=[("Texte", "*.txt *.md"), ("Tous", "*.*")])
+        if not p:
+            return
+        try:
+            content = Path(p).read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            content = Path(p).read_text(encoding="latin-1")
+        self.events.put(("transcript", content))
+
+    def on_text_modified(self, _event):
+        self.transcript.edit_modified(False)  # reset the flag or it fires once
+        has_text = bool(self.transcript.get("1.0", END).strip())
+        self.generate_btn.config(state=NORMAL if has_text else DISABLED)
+
     def transcribe_file(self, path, already_16k):
         self.set_status("Transcription en cours… (plusieurs minutes pour une "
                         "consultation complète)")
@@ -171,7 +192,9 @@ class App:
 
         def job():
             stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
-            (outdir / f"CR_{stamp}_transcript.txt").write_text(
+            report_dir = outdir / f"CR_{stamp}"
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / f"CR_{stamp}_transcript.txt").write_text(
                 text, encoding="utf-8")
             self.set_status("Démarrage du modèle local (Ollama)…")
             client = OllamaClient()
@@ -181,7 +204,7 @@ class App:
                                          progress_cb=self.set_status)
             finally:
                 client.unload()  # free ~3 GB of RAM immediately
-            out_docx = outdir / f"CR_{stamp}.docx"
+            out_docx = report_dir / f"CR_{stamp}.docx"
             fill_report(template, out_docx, result.intro_text,
                         result.section_texts, result.header_fields)
             msg = f"Compte-rendu écrit :\n{out_docx}"
