@@ -19,15 +19,23 @@ patient dans le rapport d'un autre.
 
 ## Utilisation
 
-1. Double-cliquer sur `Anamnese.command`.
+1. Double-cliquer sur **`Anamnese.app`** (l'application doit rester dans le
+   dossier du projet ; vous pouvez la glisser dans le Dock pour un accès rapide).
+   `Anamnese.command` reste disponible si vous préférez lancer depuis le Terminal.
+   Si l'app provient d'un téléchargement GitHub : clic droit → Ouvrir la
+   première fois (application non signée).
 2. Choisir Monsieur/Madame, vérifier le modèle et le dossier de sortie.
-3. **● Enregistrer** au début de l'entretien (consentement du patient requis),
-   **■ Stop** à la fin — ou « Ouvrir un audio… » pour un fichier existant.
-4. Relire/corriger la transcription, puis **Générer le compte-rendu**.
-5. Sortie : `CR_<date>.docx` (modèle rempli) + `CR_<date>_transcript.txt`
-   dans le dossier de sortie. Le brouillon doit être relu et corrigé : c'est une
-   aide à la rédaction, pas un compte-rendu final. Les conclusions restent à
-   rédiger par le clinicien.
+3. Trois entrées possibles :
+   - **● Enregistrer** au début de l'entretien (consentement du patient requis),
+     **■ Stop** à la fin ;
+   - **« Ouvrir un audio… »** pour un enregistrement existant ;
+   - **« Ouvrir un texte… »** (ou coller directement dans la zone de texte)
+     pour une transcription ou des notes déjà écrites.
+4. Relire/corriger le texte, puis **Générer le compte-rendu**.
+5. Sortie : un dossier `CR_<date>/` est créé dans le dossier de sortie,
+   contenant `CR_<date>.docx` (modèle rempli) et `CR_<date>_transcript.txt`.
+   Le brouillon doit être relu et corrigé : c'est une aide à la rédaction,
+   pas un compte-rendu final. Les conclusions restent à rédiger par le clinicien.
 
 ## Confidentialité
 

@@ -1,0 +1,15 @@
+#!/bin/zsh
+# Launcher for the Anamnèse app bundle. The bundle must stay inside the
+# project folder (it points to the project's virtualenv and code).
+APP_MACOS="${0:A:h}"                 # .../Anamnese.app/Contents/MacOS
+ROOT="${APP_MACOS:h:h:h}"            # project root (3 levels up)
+
+if [[ ! -x "$ROOT/.venv/bin/python" ]]; then
+  osascript -e 'display alert "Anamnèse — installation requise" message "L'"'"'environnement n'"'"'est pas installé. Ouvrez le Terminal dans le dossier du projet et lancez :\n\n./install.sh" as critical'
+  exit 1
+fi
+
+cd "$ROOT"
+export OLLAMA_FLASH_ATTENTION=1
+export OLLAMA_KV_CACHE_TYPE=q8_0
+exec "$ROOT/.venv/bin/python" app.py
