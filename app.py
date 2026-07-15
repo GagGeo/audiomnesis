@@ -1,4 +1,8 @@
-"""Audiomnesis — local transcription & report drafting. 100% local processing."""
+"""Audiomnesis — local transcription & report drafting. 100% local processing.
+
+The generated report is always French clinical prose; the FR/EN switch only
+translates the interface (see anamnese/i18n.py).
+"""
 import queue
 import threading
 import traceback
@@ -8,13 +12,14 @@ from tkinter import (Tk, Canvas, Frame, Label, Text, StringVar, PhotoImage,
                      filedialog, messagebox, DISABLED, NORMAL, END, ttk)
 import tkinter.font as tkfont
 
-from anamnese import config
+from anamnese import config, i18n
 from anamnese.docx_filler import fill_report
 from anamnese.generator import generate_report
 from anamnese.ollama_client import OllamaClient
 from anamnese.prompts import STYLE_SKELETONS
 from anamnese.recorder import Recorder
 from anamnese.transcriber import to_whisper_wav, transcribe
+from anamnese.ui_widgets import RoundButton, Segmented
 
 POLL_MS = 200
 
@@ -29,14 +34,14 @@ LINE = "#D6CDB8"
 MUTE = "#7B8580"
 SAGE = "#2D5249"
 SAGE2 = "#4F8B7A"
+SAGE_DARK = "#26463E"
 CLAY = "#C97B5C"
+CLAY_HOVER = "#B56A4D"
 NEGATIVE = "#B85847"
+NEG_HOVER = "#A84C3D"
 INFO_BG = "#EAF0EC"    # status callout bg
 INFO_LINE = "#CFE0D6"  # status callout border
 PLACEHOLDER = "#A79F8C"
-
-PLACEHOLDER_TEXT = ("La transcription apparaîtra ici. Démarrez un enregistrement "
-                    "ou ouvrez un fichier audio pour commencer…")
 
 
 def _pick(families, *candidates, default="TkDefaultFont"):
@@ -47,16 +52,19 @@ def _pick(families, *candidates, default="TkDefaultFont"):
 
 
 class App:
-    def __init__(self, root):
+    def __init__(self, root, lang=None):
         self.root = root
-        root.title("Audiomnesis — session locale")
-        root.geometry("900x760")
+        self.lang = lang or i18n.load_lang()
+        self.T = i18n.STRINGS[self.lang]
+        root.title(self.T["app_title"])
+        root.geometry("920x780")
         root.configure(bg=PAPER)
         self.events = queue.Queue()
         self.recorder = None
         self.audio_path = None
         self._placeholder = False
         self._pulse = False
+        self._after_id = None
 
         families = set(tkfont.families())
         serif = _pick(families, "Newsreader", "Iowan Old Style", "Georgia")
@@ -73,35 +81,8 @@ class App:
             "editor": (serif, 15),
             "italic": (serif, 12, "italic"),
         }
-
         style = ttk.Style(root)
         style.theme_use("clam")
-        style.configure(".", background=PAPER, foreground=INK,
-                        font=self.F["body"], borderwidth=0)
-        style.configure("Record.TButton", background=CLAY, foreground=PAPER,
-                        font=self.F["btn"], padding=(18, 10))
-        style.map("Record.TButton", background=[("active", "#B56A4D")])
-        style.configure("Recording.TButton", background=NEGATIVE,
-                        foreground=PAPER, font=self.F["btn"], padding=(18, 10))
-        style.map("Recording.TButton", background=[("active", "#A84C3D")])
-        style.configure("Primary.TButton", background=SAGE, foreground=PAPER,
-                        font=self.F["btn"], padding=(20, 11))
-        style.map("Primary.TButton",
-                  background=[("active", "#26463E"), ("disabled", LINE)],
-                  foreground=[("disabled", MUTE)])
-        style.configure("Ghost.TButton", background=PAPER, foreground=INK2,
-                        font=self.F["body"], padding=(13, 8),
-                        bordercolor=LINE, borderwidth=1, relief="solid")
-        style.map("Ghost.TButton", background=[("active", PAPER2)])
-        style.configure("Browse.TButton", background=PAPER2, foreground=MUTE,
-                        font=self.F["body"], padding=(10, 8))
-        style.map("Browse.TButton", background=[("active", LINE)])
-        style.configure("SegOn.TButton", background=SAGE, foreground=PAPER,
-                        font=self.F["seg"], padding=(14, 6))
-        style.map("SegOn.TButton", background=[("active", SAGE)])
-        style.configure("SegOff.TButton", background=PAPER, foreground=MUTE,
-                        font=self.F["seg"], padding=(14, 6))
-        style.map("SegOff.TButton", background=[("active", PAPER2)])
         style.configure("TEntry", fieldbackground=PAPER, foreground=INK2,
                         bordercolor=LINE, lightcolor=LINE, darkcolor=LINE,
                         insertcolor=SAGE, padding=8)
@@ -122,10 +103,15 @@ class App:
               fg=INK).pack(anchor="w")
         sub = Frame(titles, bg=PAPER)
         sub.pack(anchor="w", pady=(4, 0))
-        Label(sub, text="TRANSCRIPTION & PRÉ-RÉDACTION · ",
-              font=self.F["eyebrow"], bg=PAPER, fg=MUTE).pack(side="left")
-        Label(sub, text="100 % LOCAL", font=self.F["eyebrow"], bg=PAPER,
-              fg=SAGE).pack(side="left")
+        Label(sub, text=self.T["subtitle_prefix"], font=self.F["eyebrow"],
+              bg=PAPER, fg=MUTE).pack(side="left")
+        Label(sub, text=self.T["subtitle_local"], font=self.F["eyebrow"],
+              bg=PAPER, fg=SAGE).pack(side="left")
+        Segmented(header, values=[("fr", "FR"), ("en", "EN")],
+                  on_change=self._switch_lang, active=self.lang,
+                  parent_bg=PAPER, bg=PAPER, active_bg=SAGE, fg=MUTE,
+                  active_fg=PAPER, line=LINE, font=self.F["seg"],
+                  padx=10, pady=4).pack(side="right", anchor="n")
 
         # ----- transport toolbar (well) -----
         bar = Frame(root, bg=TOOLBAR, highlightbackground=LINE,
@@ -133,49 +119,56 @@ class App:
         bar.pack(fill="x", padx=28, pady=(0, 12))
         inner = Frame(bar, bg=TOOLBAR)
         inner.pack(fill="x", padx=12, pady=10)
-        self.record_btn = ttk.Button(inner, text="●  Enregistrer",
-                                     style="Record.TButton",
-                                     command=self.toggle_record)
+        stop_labels = ("●  " + self.T["stop"], "○  " + self.T["stop"])
+        self.record_btn = RoundButton(
+            inner, text=self.T["record"], command=self.toggle_record,
+            bg=CLAY, fg=PAPER, hover_bg=CLAY_HOVER, parent_bg=TOOLBAR,
+            font=self.F["btn"], reserve=stop_labels)
         self.record_btn.pack(side="left")
         self.timer_var = StringVar(value="00:00")
         self.timer_lbl = Label(inner, textvariable=self.timer_var,
                                font=self.F["timer"], bg=TOOLBAR, fg=INK)
         self.timer_lbl.pack(side="left", padx=14)
         Frame(inner, bg=LINE, width=1, height=30).pack(side="left", padx=(0, 12))
-        ttk.Button(inner, text="♪  Ouvrir un audio…", style="Ghost.TButton",
-                   command=self.open_audio).pack(side="left", padx=(0, 8))
-        ttk.Button(inner, text="🗎  Ouvrir un texte…", style="Ghost.TButton",
-                   command=self.open_text).pack(side="left")
-        seg = Frame(inner, bg=PAPER, highlightbackground=LINE,
-                    highlightthickness=1)
-        seg.pack(side="right")
+        RoundButton(inner, text=self.T["open_audio"], command=self.open_audio,
+                    bg=PAPER, fg=INK2, hover_bg=PAPER2, parent_bg=TOOLBAR,
+                    font=self.F["body"], outline=LINE, padx=14,
+                    ).pack(side="left", padx=(0, 8))
+        RoundButton(inner, text=self.T["open_text"], command=self.open_text,
+                    bg=PAPER, fg=INK2, hover_bg=PAPER2, parent_bg=TOOLBAR,
+                    font=self.F["body"], outline=LINE, padx=14,
+                    ).pack(side="left")
         self.title_var = StringVar(value="Monsieur XXX")
-        self.seg_m = ttk.Button(seg, text="Monsieur", style="SegOn.TButton",
-                                command=lambda: self._set_civ("M"))
-        self.seg_m.pack(side="left", padx=2, pady=2)
-        self.seg_f = ttk.Button(seg, text="Madame", style="SegOff.TButton",
-                                command=lambda: self._set_civ("F"))
-        self.seg_f.pack(side="left", padx=(0, 2), pady=2)
+        self.civ_seg = Segmented(
+            inner, values=[("M", self.T["monsieur"]), ("F", self.T["madame"])],
+            on_change=self._set_civ, active="M", parent_bg=TOOLBAR, bg=PAPER,
+            active_bg=SAGE, fg=MUTE, active_fg=PAPER, line=LINE,
+            font=self.F["seg"])
+        self.civ_seg.pack(side="right")
 
         # ----- path fields -----
         paths = Frame(root, bg=PAPER)
         paths.pack(fill="x", padx=28)
         paths.columnconfigure(1, weight=1)
-        Label(paths, text="MODÈLE", font=self.F["eyebrow"], bg=PAPER,
-              fg=MUTE).grid(row=0, column=0, sticky="w", padx=(0, 10))
+        Label(paths, text=self.T["template_label"], font=self.F["eyebrow"],
+              bg=PAPER, fg=MUTE).grid(row=0, column=0, sticky="w", padx=(0, 10))
         self.template_var = StringVar(value=str(config.DEFAULT_TEMPLATE))
         ttk.Entry(paths, textvariable=self.template_var,
                   font=self.F["mono"]).grid(row=0, column=1, sticky="ew", pady=3)
-        ttk.Button(paths, text="…", style="Browse.TButton", width=2,
-                   command=self.pick_template).grid(row=0, column=2, padx=(8, 0))
-        Label(paths, text="SORTIE", font=self.F["eyebrow"], bg=PAPER,
-              fg=MUTE).grid(row=1, column=0, sticky="w", padx=(0, 10))
+        RoundButton(paths, text="…", command=self.pick_template, bg=PAPER2,
+                    fg=MUTE, hover_bg=LINE, parent_bg=PAPER,
+                    font=self.F["body"], padx=12, pady=7, radius=9
+                    ).grid(row=0, column=2, padx=(8, 0))
+        Label(paths, text=self.T["output_label"], font=self.F["eyebrow"],
+              bg=PAPER, fg=MUTE).grid(row=1, column=0, sticky="w", padx=(0, 10))
         default_out = Path.home() / "Documents" / "CR-anamnese"
         self.outdir_var = StringVar(value=str(default_out))
         ttk.Entry(paths, textvariable=self.outdir_var,
                   font=self.F["mono"]).grid(row=1, column=1, sticky="ew", pady=3)
-        ttk.Button(paths, text="…", style="Browse.TButton", width=2,
-                   command=self.pick_outdir).grid(row=1, column=2, padx=(8, 0))
+        RoundButton(paths, text="…", command=self.pick_outdir, bg=PAPER2,
+                    fg=MUTE, hover_bg=LINE, parent_bg=PAPER,
+                    font=self.F["body"], padx=12, pady=7, radius=9
+                    ).grid(row=1, column=2, padx=(8, 0))
 
         # ----- status callout -----
         callout = Frame(root, bg=INFO_BG, highlightbackground=INFO_LINE,
@@ -185,8 +178,7 @@ class App:
                      highlightthickness=0)
         dot.create_oval(1, 1, 9, 9, fill=SAGE2, outline="")
         dot.pack(side="left", padx=(12, 8), pady=10)
-        self.status_var = StringVar(
-            value="Prêt. Rappel : le patient doit avoir consenti à l'enregistrement.")
+        self.status_var = StringVar(value=self.T["status_ready"])
         Label(callout, textvariable=self.status_var, anchor="w", bg=INFO_BG,
               fg=INK2, font=self.F["body"]).pack(
             side="left", fill="x", expand=True, pady=8, padx=(0, 12))
@@ -194,9 +186,9 @@ class App:
         # ----- transcription -----
         head = Frame(root, bg=PAPER)
         head.pack(fill="x", padx=28)
-        Label(head, text="TRANSCRIPTION — RELISEZ ET CORRIGEZ AVANT DE GÉNÉRER",
-              font=self.F["eyebrow"], bg=PAPER, fg=SAGE).pack(side="left")
-        self.words_var = StringVar(value="0 mots")
+        Label(head, text=self.T["transcript_head"], font=self.F["eyebrow"],
+              bg=PAPER, fg=SAGE).pack(side="left")
+        self.words_var = StringVar(value=f"0 {self.T['words']}")
         Label(head, textvariable=self.words_var, font=self.F["eyebrow"],
               bg=PAPER, fg=MUTE).pack(side="right")
         self.transcript = Text(root, wrap="word", height=12, bg=PAPER3,
@@ -215,21 +207,34 @@ class App:
         # ----- footer -----
         footer = Frame(root, bg=PAPER)
         footer.pack(fill="x", padx=28, pady=14)
-        Label(footer, text="Traitement effectué localement — aucune donnée ne "
-                           "quitte cet appareil.", font=self.F["italic"],
+        Label(footer, text=self.T["privacy_note"], font=self.F["italic"],
               bg=PAPER, fg=MUTE).pack(side="left")
-        self.generate_btn = ttk.Button(footer, text="✎  Générer le compte-rendu",
-                                       style="Primary.TButton", state=DISABLED,
-                                       command=self.generate)
+        self.generate_btn = RoundButton(
+            footer, text=self.T["generate"], command=self.generate,
+            bg=SAGE, fg=PAPER, hover_bg=SAGE_DARK, parent_bg=PAPER,
+            font=self.F["btn"], padx=20, pady=10,
+            disabled_bg=LINE, disabled_fg=MUTE)
+        self.generate_btn.set_enabled(False)
         self.generate_btn.pack(side="right")
 
-        root.after(POLL_MS, self.poll)
+        self._after_id = root.after(POLL_MS, self.poll)
+
+    # ---------- language ----------
+    def _switch_lang(self, lang):
+        if self.recorder is not None:
+            return  # never rebuild the UI mid-recording
+        i18n.save_lang(lang)
+        if self._after_id:
+            self.root.after_cancel(self._after_id)
+        for w in self.root.winfo_children():
+            w.destroy()
+        App(self.root, lang)
 
     # ---------- placeholder handling ----------
     def _show_placeholder(self):
         if not self.transcript.get("1.0", END).strip():
             self._placeholder = True
-            self.transcript.insert("1.0", PLACEHOLDER_TEXT)
+            self.transcript.insert("1.0", self.T["placeholder"])
             self.transcript.config(fg=PLACEHOLDER)
             self.transcript.edit_modified(False)
 
@@ -250,8 +255,6 @@ class App:
     # ---------- UI helpers ----------
     def _set_civ(self, civ):
         self.title_var.set("Monsieur XXX" if civ == "M" else "Madame XXX")
-        self.seg_m.config(style="SegOn.TButton" if civ == "M" else "SegOff.TButton")
-        self.seg_f.config(style="SegOn.TButton" if civ == "F" else "SegOff.TButton")
 
     def set_status(self, msg):
         self.events.put(("status", msg))
@@ -267,24 +270,23 @@ class App:
                     self.transcript.delete("1.0", END)
                     self.transcript.insert("1.0", payload)
                     self.transcript.config(fg=INK)
-                    self.generate_btn.config(state=NORMAL)
-                    self.status_var.set("Transcription terminée. Relisez, "
-                                        "corrigez, puis générez le compte-rendu.")
+                    self.generate_btn.set_enabled(True)
+                    self.status_var.set(self.T["status_transcribed"])
                 elif kind == "done":
-                    self.generate_btn.config(state=NORMAL)
-                    messagebox.showinfo("Terminé", payload)
+                    self.generate_btn.set_enabled(True)
+                    messagebox.showinfo(self.T["done_title"], payload)
                 elif kind == "error":
-                    self.generate_btn.config(state=NORMAL)
-                    messagebox.showerror("Erreur", payload)
+                    self.generate_btn.set_enabled(True)
+                    messagebox.showerror(self.T["error_title"], payload)
         except queue.Empty:
             pass
         if self.recorder is not None:
             s = self.recorder.elapsed_seconds()
             self.timer_var.set(f"{s // 60:02d}:{s % 60:02d}")
             self._pulse = not self._pulse
-            self.record_btn.config(
-                text=("●  Arrêter" if self._pulse else "○  Arrêter"))
-        self.root.after(POLL_MS, self.poll)
+            dot = "●" if self._pulse else "○"
+            self.record_btn.set_text(f"{dot}  {self.T['stop']}")
+        self._after_id = self.root.after(POLL_MS, self.poll)
 
     def run_bg(self, fn):
         def wrapper():
@@ -296,7 +298,8 @@ class App:
 
     # ---------- actions ----------
     def pick_template(self):
-        p = filedialog.askopenfilename(filetypes=[("Word", "*.docx")])
+        p = filedialog.askopenfilename(
+            filetypes=[(self.T["filter_word"], "*.docx")])
         if p:
             self.template_var.set(p)
 
@@ -312,32 +315,34 @@ class App:
                 self.audio_path = self.recorder.start()
             except Exception as e:
                 self.recorder = None
-                messagebox.showerror(
-                    "Micro indisponible",
-                    "Impossible d'accéder au micro. Vérifiez :\nRéglages Système"
-                    " → Confidentialité et sécurité → Microphone,\npuis autorisez"
-                    f" Audiomnesis.\n\nDétail : {e}")
+                messagebox.showerror(self.T["err_mic_title"],
+                                     self.T["err_mic"].format(error=e))
                 return
-            self.record_btn.config(text="●  Arrêter", style="Recording.TButton")
+            self.record_btn.set_text("●  " + self.T["stop"])
+            self.record_btn.set_colors(bg=NEGATIVE, hover_bg=NEG_HOVER)
             self.timer_lbl.config(fg=NEGATIVE)
-            self.set_status(f"Enregistrement en cours → {self.audio_path.name}")
+            self.set_status(
+                self.T["status_recording"].format(name=self.audio_path.name))
         else:
             rec, self.recorder = self.recorder, None
             wav = rec.stop()
-            self.record_btn.config(text="●  Enregistrer", style="Record.TButton")
+            self.record_btn.set_text(self.T["record"])
+            self.record_btn.set_colors(bg=CLAY, hover_bg=CLAY_HOVER)
             self.timer_lbl.config(fg=INK)
             self.transcribe_file(wav, already_16k=True)
 
     def open_audio(self):
         p = filedialog.askopenfilename(
-            filetypes=[("Audio", "*.wav *.mp3 *.m4a *.aiff *.aac *.ogg *.flac")])
+            filetypes=[(self.T["filter_audio"],
+                        "*.wav *.mp3 *.m4a *.aiff *.aac *.ogg *.flac")])
         if p:
             self.transcribe_file(Path(p), already_16k=False)
 
     def open_text(self):
         """Third input mode: an existing transcript/notes text file."""
         p = filedialog.askopenfilename(
-            filetypes=[("Texte", "*.txt *.md"), ("Tous", "*.*")])
+            filetypes=[(self.T["filter_text"], "*.txt *.md"),
+                       (self.T["filter_all"], "*.*")])
         if not p:
             return
         try:
@@ -349,13 +354,13 @@ class App:
     def on_text_modified(self, _event):
         self.transcript.edit_modified(False)  # reset the flag or it fires once
         text = self._real_text()
-        self.words_var.set(f"{len(text.split())} mots" if text else "0 mots")
-        self.generate_btn.config(state=NORMAL if text else DISABLED)
+        n = len(text.split()) if text else 0
+        self.words_var.set(f"{n} {self.T['words']}")
+        self.generate_btn.set_enabled(bool(text))
 
     def transcribe_file(self, path, already_16k):
-        self.set_status("Transcription en cours… (plusieurs minutes pour une "
-                        "consultation complète)")
-        self.generate_btn.config(state=DISABLED)
+        self.set_status(self.T["status_transcribing"])
+        self.generate_btn.set_enabled(False)
         def job():
             config.RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
             wav = path if already_16k else to_whisper_wav(path, config.RECORDINGS_DIR)
@@ -365,16 +370,17 @@ class App:
     def generate(self):
         text = self._real_text()
         if not text:
-            messagebox.showwarning("Vide", "Aucune transcription à traiter.")
+            messagebox.showwarning(self.T["warn_empty_title"],
+                                   self.T["warn_empty"])
             return
         template = Path(self.template_var.get())
         if not template.exists():
-            messagebox.showerror("Modèle introuvable", str(template))
+            messagebox.showerror(self.T["err_template_title"], str(template))
             return
         outdir = Path(self.outdir_var.get())
         outdir.mkdir(parents=True, exist_ok=True)
         title = self.title_var.get()
-        self.generate_btn.config(state=DISABLED)
+        self.generate_btn.set_enabled(False)
 
         def job():
             stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
@@ -382,7 +388,7 @@ class App:
             report_dir.mkdir(parents=True, exist_ok=True)
             (report_dir / f"CR_{stamp}_transcript.txt").write_text(
                 text, encoding="utf-8")
-            self.set_status("Démarrage du modèle local (Ollama)…")
+            self.set_status(self.T["status_ollama"])
             client = OllamaClient()
             client.ensure_running()
             try:
@@ -393,12 +399,12 @@ class App:
             out_docx = report_dir / f"CR_{stamp}.docx"
             fill_report(template, out_docx, result.intro_text,
                         result.section_texts, result.header_fields)
-            msg = f"Compte-rendu écrit :\n{out_docx}"
+            msg = self.T["done_msg"].format(path=out_docx)
             if result.no_info:
-                msg += "\n\nSections sans information dans l'entretien :\n- " \
+                msg += "\n\n" + self.T["done_no_info"] + "\n- " \
                        + "\n- ".join(result.no_info)
             if result.failed:
-                msg += "\n\nSections en échec (à rédiger à la main) :\n- " \
+                msg += "\n\n" + self.T["done_failed"] + "\n- " \
                        + "\n- ".join(result.failed)
             self.events.put(("done", msg))
         self.run_bg(job)

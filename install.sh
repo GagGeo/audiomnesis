@@ -3,7 +3,19 @@
 set -e
 cd "$(dirname "$0")"
 
-echo "→ whisper.cpp (Homebrew)"
+echo "→ Vérification des prérequis"
+if ! command -v brew >/dev/null; then
+  echo "✗ Homebrew est requis : https://brew.sh" >&2; exit 1
+fi
+if ! command -v ollama >/dev/null; then
+  echo "✗ Ollama est requis : https://ollama.com/download (ou : brew install ollama)" >&2; exit 1
+fi
+if ! command -v clang >/dev/null; then
+  echo "✗ Outils de développement requis : xcode-select --install" >&2; exit 1
+fi
+
+echo "→ ffmpeg + whisper.cpp (Homebrew)"
+brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
 brew list whisper-cpp >/dev/null 2>&1 || brew install whisper-cpp
 
 echo "→ Python venv + dépendances"
