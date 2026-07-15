@@ -6,6 +6,7 @@ MODELS_DIR = APP_DIR / "models"
 RECORDINGS_DIR = APP_DIR / "recordings"
 
 DEFAULT_TEMPLATE = DOCS_DIR / "bilan-cr.docx"
+SETTINGS_FILE = APP_DIR / ".settings.json"
 
 WHISPER_MODEL = MODELS_DIR / "ggml-large-v3-turbo-q5_0.bin"
 WHISPER_BIN = "whisper-cli"  # from `brew install whisper-cpp`
