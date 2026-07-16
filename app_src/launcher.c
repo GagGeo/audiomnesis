@@ -47,6 +47,14 @@ int main(void) {
     setenv("OLLAMA_FLASH_ATTENTION", "1", 1);
     setenv("OLLAMA_KV_CACHE_TYPE", "q8_0", 1);
 
+    /* Finder launches apps with a minimal PATH that excludes Homebrew;
+     * ffmpeg / whisper-cli / ollama live there. */
+    const char *old_path = getenv("PATH");
+    char path[PATH_MAX * 2];
+    snprintf(path, sizeof path, "/opt/homebrew/bin:/usr/local/bin:%s",
+             old_path ? old_path : "/usr/bin:/bin:/usr/sbin:/sbin");
+    setenv("PATH", path, 1);
+
     char logpath[PATH_MAX];
     snprintf(logpath, sizeof logpath, "%s/.app.log", root);
     freopen(logpath, "a", stdout);
