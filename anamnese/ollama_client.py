@@ -31,7 +31,7 @@ class OllamaClient:
             return
         env = dict(os.environ,
                    OLLAMA_FLASH_ATTENTION="1", OLLAMA_KV_CACHE_TYPE="q8_0")
-        subprocess.Popen(["ollama", "serve"], env=env,
+        subprocess.Popen([config.OLLAMA_BIN, "serve"], env=env,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for _ in range(30):
             time.sleep(1)
