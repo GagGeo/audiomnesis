@@ -1,7 +1,8 @@
 """Audiomnesis — local transcription & report drafting. 100% local processing.
 
-The generated report is always French clinical prose; the FR/EN switch only
-translates the interface (see anamnese/i18n.py).
+The FR/EN switch in the header translates the INTERFACE (anamnese/i18n.py).
+The REPORT language is chosen separately (Auto/FR/EN) and may differ: Auto
+detects it from the transcript. See anamnese/lang.py.
 """
 import queue
 import threading
@@ -12,11 +13,11 @@ from tkinter import (Tk, Canvas, Frame, Label, Text, StringVar, PhotoImage,
                      filedialog, messagebox, DISABLED, NORMAL, END, ttk)
 import tkinter.font as tkfont
 
-from anamnese import config, i18n
+from anamnese import config, i18n, lang as lang_mod, settings, style_examples
 from anamnese.docx_filler import fill_report
 from anamnese.generator import generate_report
 from anamnese.ollama_client import OllamaClient
-from anamnese.prompts import STYLE_SKELETONS
+from anamnese.prompts import skeletons
 from anamnese.recorder import Recorder
 from anamnese.transcriber import to_whisper_wav, transcribe
 from anamnese.ui_widgets import RoundButton, Segmented
@@ -62,6 +63,8 @@ class App:
         self.events = queue.Queue()
         self.recorder = None
         self.audio_path = None
+        self.civ = "M"               # "M" | "F" — report patient designation
+        self.report_lang = "auto"    # "auto" | "fr" | "en"
         self._placeholder = False
         self._pulse = False
         self._after_id = None
@@ -138,7 +141,6 @@ class App:
                     bg=PAPER, fg=INK2, hover_bg=PAPER2, parent_bg=TOOLBAR,
                     font=self.F["body"], outline=LINE, padx=14,
                     ).pack(side="left")
-        self.title_var = StringVar(value="Monsieur XXX")
         self.civ_seg = Segmented(
             inner, values=[("M", self.T["monsieur"]), ("F", self.T["madame"])],
             on_change=self._set_civ, active="M", parent_bg=TOOLBAR, bg=PAPER,
@@ -169,6 +171,31 @@ class App:
                     fg=MUTE, hover_bg=LINE, parent_bg=PAPER,
                     font=self.F["body"], padx=12, pady=7, radius=9
                     ).grid(row=1, column=2, padx=(8, 0))
+
+        # report language (Auto / FR / EN) — separate from the interface switch
+        Label(paths, text=self.T["report_lang_label"], font=self.F["eyebrow"],
+              bg=PAPER, fg=MUTE).grid(row=2, column=0, sticky="w",
+                                      padx=(0, 10), pady=(6, 0))
+        Segmented(paths, values=[("auto", self.T["report_lang_auto"]),
+                                 ("fr", "FR"), ("en", "EN")],
+                  on_change=self._set_report_lang, active=self.report_lang,
+                  parent_bg=PAPER, bg=PAPER2, active_bg=SAGE, fg=MUTE,
+                  active_fg=PAPER, line=LINE, font=self.F["seg"]).grid(
+            row=2, column=1, sticky="w", pady=(6, 0))
+
+        # style examples folder (feature: learn the clinician's writing style)
+        Label(paths, text=self.T["examples_label"], font=self.F["eyebrow"],
+              bg=PAPER, fg=MUTE).grid(row=3, column=0, sticky="w", padx=(0, 10))
+        self.examples_var = StringVar(value=settings.get("examples_dir", ""))
+        ttk.Entry(paths, textvariable=self.examples_var,
+                  font=self.F["mono"]).grid(row=3, column=1, sticky="ew", pady=3)
+        RoundButton(paths, text="…", command=self.pick_examples, bg=PAPER2,
+                    fg=MUTE, hover_bg=LINE, parent_bg=PAPER,
+                    font=self.F["body"], padx=12, pady=7, radius=9
+                    ).grid(row=3, column=2, padx=(8, 0))
+        Label(paths, text=self.T["examples_warn"], font=self.F["italic"],
+              bg=PAPER, fg=CLAY, wraplength=820, justify="left").grid(
+            row=4, column=1, columnspan=2, sticky="w", pady=(0, 2))
 
         # ----- status callout -----
         callout = Frame(root, bg=INFO_BG, highlightbackground=INFO_LINE,
@@ -254,7 +281,10 @@ class App:
 
     # ---------- UI helpers ----------
     def _set_civ(self, civ):
-        self.title_var.set("Monsieur XXX" if civ == "M" else "Madame XXX")
+        self.civ = civ
+
+    def _set_report_lang(self, key):
+        self.report_lang = key
 
     def set_status(self, msg):
         self.events.put(("status", msg))
@@ -307,6 +337,12 @@ class App:
         p = filedialog.askdirectory()
         if p:
             self.outdir_var.set(p)
+
+    def pick_examples(self):
+        p = filedialog.askdirectory()
+        if p:
+            self.examples_var.set(p)
+            settings.set("examples_dir", p)
 
     def toggle_record(self):
         if self.recorder is None:
@@ -373,13 +409,16 @@ class App:
             messagebox.showwarning(self.T["warn_empty_title"],
                                    self.T["warn_empty"])
             return
-        template = Path(self.template_var.get())
+        rlang = lang_mod.resolve(self.report_lang, text)   # auto -> detected
+        template = (config.DEFAULT_TEMPLATE_EN if rlang == "en"
+                    else Path(self.template_var.get()))
         if not template.exists():
             messagebox.showerror(self.T["err_template_title"], str(template))
             return
         outdir = Path(self.outdir_var.get())
         outdir.mkdir(parents=True, exist_ok=True)
-        title = self.title_var.get()
+        title = lang_mod.patient_title(self.civ, rlang)
+        examples_dir = self.examples_var.get().strip()
         self.generate_btn.set_enabled(False)
 
         def job():
@@ -389,16 +428,20 @@ class App:
             (report_dir / f"CR_{stamp}_transcript.txt").write_text(
                 text, encoding="utf-8")
             self.set_status(self.T["status_ollama"])
+            # Real anonymized reports override the generic skeletons where found.
+            real = style_examples.load(examples_dir, rlang)
+            examples = {**skeletons(rlang), **real}
             client = OllamaClient()
             client.ensure_running()
             try:
-                result = generate_report(text, client, STYLE_SKELETONS, title,
-                                         progress_cb=self.set_status)
+                result = generate_report(text, client, examples, title,
+                                         progress_cb=self.set_status, lang=rlang,
+                                         example_is_real=bool(real))
             finally:
                 client.unload()  # free ~3 GB of RAM immediately
             out_docx = report_dir / f"CR_{stamp}.docx"
             fill_report(template, out_docx, result.intro_text,
-                        result.section_texts, result.header_fields)
+                        result.section_texts, result.header_fields, rlang)
             msg = self.T["done_msg"].format(path=out_docx)
             if result.no_info:
                 msg += "\n\n" + self.T["done_no_info"] + "\n- " \

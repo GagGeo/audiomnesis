@@ -4,17 +4,30 @@ from pathlib import Path
 
 import docx
 
-from anamnese.sections import SECTIONS, INTRO_LEADIN, norm
+from anamnese import sections
+from anamnese.sections import SECTIONS, norm
 
-# label prefix (normalized) -> header_fields key, for document.tables[1]
+# label prefix (normalized) -> header_fields key, for document.tables[1],
+# per report language (matches the FR / EN template's header table).
 _HEADER_LABELS = {
-    "latéralité :": "laterality",
-    "langue maternelle :": "langue_maternelle",
-    "statut marital :": "statut_marital",
-    "niveau d'études :": "niveau_etudes",
-    "profession :": "profession",
-    "motif de consultation :": "motif_consultation",
-    "accompagnant :": "accompagnant",
+    "fr": {
+        "latéralité :": "laterality",
+        "langue maternelle :": "langue_maternelle",
+        "statut marital :": "statut_marital",
+        "niveau d'études :": "niveau_etudes",
+        "profession :": "profession",
+        "motif de consultation :": "motif_consultation",
+        "accompagnant :": "accompagnant",
+    },
+    "en": {
+        "handedness:": "laterality",
+        "mother tongue:": "langue_maternelle",
+        "marital status:": "statut_marital",
+        "level of education:": "niveau_etudes",
+        "profession:": "profession",
+        "reason for consultation:": "motif_consultation",
+        "support person:": "accompagnant",
+    },
 }
 
 
@@ -44,12 +57,13 @@ def _find_paragraph(doc, predicate):
     return None, None
 
 
-def _section_stub_paragraphs(doc, section):
+def _section_stub_paragraphs(doc, section, lang):
     """Stub paragraphs = paragraphs after the heading until the next heading."""
-    headings = {norm(s.heading) for s in SECTIONS}
-    idx, _ = _find_paragraph(doc, lambda t: norm(t) == norm(section.heading))
+    headings = {norm(sections.heading(s, lang)) for s in SECTIONS}
+    target = sections.heading(section, lang)
+    idx, _ = _find_paragraph(doc, lambda t: norm(t) == norm(target))
     if idx is None:
-        raise ValueError(f"Heading not found: {section.heading}")
+        raise ValueError(f"Heading not found: {target}")
     stubs = []
     for p in doc.paragraphs[idx + 1:]:
         if norm(p.text) in headings:
@@ -59,10 +73,10 @@ def _section_stub_paragraphs(doc, section):
     return stubs
 
 
-def _fill_section(doc, section, text):
-    stubs = _section_stub_paragraphs(doc, section)
+def _fill_section(doc, section, text, lang):
+    stubs = _section_stub_paragraphs(doc, section, lang)
     if not stubs:
-        raise ValueError(f"No stub paragraphs under: {section.heading}")
+        raise ValueError(f"No stub paragraphs under: {sections.heading(section, lang)}")
     paras = [t.strip() for t in text.split("\n") if t.strip()]
     # remove extra stubs beyond the first, then grow from the first
     anchor = stubs[0]
@@ -73,8 +87,9 @@ def _fill_section(doc, section, text):
         anchor = _insert_paragraph_after(anchor, t)
 
 
-def _fill_header_fields(doc, header_fields):
+def _fill_header_fields(doc, header_fields, lang):
     table = doc.tables[1]
+    labels = _HEADER_LABELS[lang]
     seen = set()
     for row in table.rows:
         for cell in row.cells:
@@ -83,29 +98,30 @@ def _fill_header_fields(doc, header_fields):
             seen.add(id(cell._tc))
             for p in cell.paragraphs:
                 n = norm(p.text)
-                for label, key in _HEADER_LABELS.items():
+                for label, key in labels.items():
                     value = header_fields.get(key)
                     if value and n == label.rstrip():
                         _set_text(p, p.text.rstrip() + " " + str(value))
 
 
 def fill_report(template_path: Path, output_path: Path, intro_text: str,
-                section_texts: dict, header_fields: dict) -> None:
+                section_texts: dict, header_fields: dict, lang: str = "fr") -> None:
     """Write output_path from template_path. Never modifies the template.
 
     section_texts: section key -> generated text (paragraphs separated by
     newline) or None to leave the template stubs untouched.
+    lang: report language, selecting which heading/label anchors to match.
     """
     doc = docx.Document(str(template_path))
     if intro_text:
-        _, intro_par = _find_paragraph(
-            doc, lambda t: norm(t).startswith(norm(INTRO_LEADIN)))
+        leadin = norm(sections.leadin(lang))
+        _, intro_par = _find_paragraph(doc, lambda t: norm(t).startswith(leadin))
         if intro_par is not None:
             _set_text(intro_par, intro_text)
     for section in SECTIONS:
         text = section_texts.get(section.key)
         if text:
-            _fill_section(doc, section, text)
+            _fill_section(doc, section, text, lang)
     if header_fields:
-        _fill_header_fields(doc, header_fields)
+        _fill_header_fields(doc, header_fields, lang)
     doc.save(str(output_path))

@@ -58,3 +58,20 @@ def test_header_extraction_failure_is_non_fatal():
     r = generate_report("t", BadJson(), EXAMPLES, "Monsieur XXX")
     assert r.header_fields == {}
     assert r.section_texts["plaintes"]
+
+
+def test_english_report_uses_english_sentinel_and_headings():
+    class EnClient:
+        def generate(self, prompt, system=None, num_predict=1500):
+            if '"laterality"' in prompt:
+                return '{"laterality": "Right-handed"}'
+            if "I am seeing today" in prompt:
+                return "I am seeing today Mr XXX, aged 40."
+            return "NO INFORMATION"  # every section has no info
+    r = generate_report("transcript", EnClient(),
+                        {k: "ex" for k in EXAMPLES}, "Mr XXX", lang="en")
+    # English headings reported, English sentinel recognised
+    assert "Current complaints and functional impact" in r.no_info
+    assert all(v is None for v in r.section_texts.values())
+    assert r.intro_text.startswith("I am seeing today")
+    assert r.header_fields["laterality"] == "Right-handed"

@@ -28,10 +28,12 @@ def to_whisper_wav(audio_path: Path, workdir: Path) -> Path:
     return out
 
 
-def build_command(wav_path: Path, output_base: Path) -> list:
+def build_command(wav_path: Path, output_base: Path, lang: str = "auto") -> list:
+    # "auto": let whisper detect fr vs en so an English consult is not forced
+    # through the French model and mangled.
     return [config.WHISPER_BIN,
             "-m", str(config.WHISPER_MODEL),
-            "-l", "fr",
+            "-l", lang,
             "-f", str(wav_path),
             "--output-txt",
             "--output-file", str(output_base),
