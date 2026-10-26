@@ -3,9 +3,7 @@
 The generated REPORT stays in French regardless of the interface language —
 it is a French clinical document. Only the UI is translated.
 """
-import json
-
-from anamnese import config
+from anamnese import settings
 
 STRINGS = {
     "fr": {
@@ -20,6 +18,13 @@ STRINGS = {
         "madame": "Madame",
         "template_label": "MODÈLE",
         "output_label": "SORTIE",
+        "report_lang_label": "LANGUE DU CR",
+        "report_lang_auto": "Auto",
+        "examples_label": "EXEMPLES DE STYLE",
+        "examples_warn": ("⚠ Les comptes-rendus déposés ici doivent être "
+                          "ANONYMISÉS : ils sont envoyés tels quels au modèle "
+                          "local comme référence de style (format .docx)."),
+        "filter_folder": "Dossier",
         "status_ready": "Prêt. Rappel : le patient doit avoir consenti à l'enregistrement.",
         "transcript_head": "TRANSCRIPTION — RELISEZ ET CORRIGEZ AVANT DE GÉNÉRER",
         "words": "mots",
@@ -63,6 +68,13 @@ STRINGS = {
         "madame": "Ms",
         "template_label": "TEMPLATE",
         "output_label": "OUTPUT",
+        "report_lang_label": "REPORT LANGUAGE",
+        "report_lang_auto": "Auto",
+        "examples_label": "STYLE EXAMPLES",
+        "examples_warn": ("⚠ Reports placed here must be ANONYMIZED: they are "
+                          "sent as-is to the local model as a style reference "
+                          "(.docx format)."),
+        "filter_folder": "Folder",
         "status_ready": "Ready. Reminder: the patient must have consented to the recording.",
         "transcript_head": "TRANSCRIPT — PROOFREAD AND CORRECT BEFORE GENERATING",
         "words": "words",
@@ -97,14 +109,8 @@ STRINGS = {
 
 
 def load_lang() -> str:
-    try:
-        return json.loads(config.SETTINGS_FILE.read_text()).get("lang", "fr")
-    except Exception:
-        return "fr"
+    return settings.get("lang", "fr")
 
 
 def save_lang(lang: str) -> None:
-    try:
-        config.SETTINGS_FILE.write_text(json.dumps({"lang": lang}))
-    except OSError:
-        pass  # a failed preference save must never break the app
+    settings.set("lang", lang)

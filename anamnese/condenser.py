@@ -18,7 +18,7 @@ def chunk_text(text: str, chunk_words=2200, overlap_words=200):
     return chunks
 
 
-def prepare_source(transcript: str, client, progress_cb=None) -> str:
+def prepare_source(transcript: str, client, progress_cb=None, lang="fr") -> str:
     """Return the text to feed section prompts: the transcript itself when it
     fits, otherwise per-chunk clinical notes produced by the local model."""
     if estimate_tokens(transcript) <= config.CONDENSE_TOKEN_THRESHOLD:
@@ -28,5 +28,5 @@ def prepare_source(transcript: str, client, progress_cb=None) -> str:
     for i, chunk in enumerate(chunks, 1):
         if progress_cb:
             progress_cb(f"Condensation {i}/{len(chunks)}")
-        notes.append(client.generate(notes_prompt(chunk), num_predict=1200))
+        notes.append(client.generate(notes_prompt(chunk, lang), num_predict=1200))
     return "\n".join(notes)

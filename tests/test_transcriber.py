@@ -8,11 +8,17 @@ from anamnese import config
 from anamnese.transcriber import build_command, transcribe, to_whisper_wav
 
 
-def test_build_command_french_txt_output(tmp_path):
+def test_build_command_autodetect_txt_output(tmp_path):
     cmd = build_command(tmp_path / "a.wav", tmp_path / "out")
     s = " ".join(str(c) for c in cmd)
-    assert config.WHISPER_BIN in s and "-l fr" in s and "--output-txt" in s
+    assert config.WHISPER_BIN in s and "-l auto" in s and "--output-txt" in s
     assert str(config.WHISPER_MODEL) in s
+
+
+def test_build_command_accepts_explicit_lang(tmp_path):
+    s = " ".join(str(c) for c in build_command(tmp_path / "a.wav",
+                                               tmp_path / "out", lang="en"))
+    assert "-l en" in s
 
 
 def test_transcribe_reads_txt_output(tmp_path):
