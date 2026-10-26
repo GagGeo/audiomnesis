@@ -58,7 +58,11 @@ class App:
         self.lang = lang or i18n.load_lang()
         self.T = i18n.STRINGS[self.lang]
         root.title(self.T["app_title"])
-        root.geometry("920x780")
+        # Never open taller than the screen (minus menu bar / dock), or the
+        # footer with the Generate button lands below the visible area.
+        height = min(780, root.winfo_screenheight() - 140)
+        root.geometry(f"920x{height}")
+        root.minsize(860, 520)
         root.configure(bg=PAPER)
         self.events = queue.Queue()
         self.recorder = None
@@ -193,9 +197,13 @@ class App:
                     fg=MUTE, hover_bg=LINE, parent_bg=PAPER,
                     font=self.F["body"], padx=12, pady=7, radius=9
                     ).grid(row=3, column=2, padx=(8, 0))
-        Label(paths, text=self.T["examples_warn"], font=self.F["italic"],
-              bg=PAPER, fg=CLAY, wraplength=820, justify="left").grid(
-            row=4, column=1, columnspan=2, sticky="w", pady=(0, 2))
+        warn = Label(paths, text=self.T["examples_warn"], font=self.F["italic"],
+                     bg=PAPER, fg=CLAY, justify="left", anchor="w", wraplength=300)
+        warn.grid(row=4, column=1, columnspan=2, sticky="ew", pady=(0, 2))
+        # wrap to the actual column width so the warning never overflows the
+        # window when it is not stretched wide.
+        warn.bind("<Configure>",
+                  lambda e: e.widget.config(wraplength=max(e.width - 4, 120)))
 
         # ----- status callout -----
         callout = Frame(root, bg=INFO_BG, highlightbackground=INFO_LINE,
@@ -210,7 +218,21 @@ class App:
               fg=INK2, font=self.F["body"]).pack(
             side="left", fill="x", expand=True, pady=8, padx=(0, 12))
 
-        # ----- transcription -----
+        # ----- footer ----- (pinned to the bottom BEFORE the expanding
+        # transcript, so the Generate button is never clipped on short screens)
+        footer = Frame(root, bg=PAPER)
+        footer.pack(side="bottom", fill="x", padx=28, pady=14)
+        Label(footer, text=self.T["privacy_note"], font=self.F["italic"],
+              bg=PAPER, fg=MUTE).pack(side="left")
+        self.generate_btn = RoundButton(
+            footer, text=self.T["generate"], command=self.generate,
+            bg=SAGE, fg=PAPER, hover_bg=SAGE_DARK, parent_bg=PAPER,
+            font=self.F["btn"], padx=20, pady=10,
+            disabled_bg=LINE, disabled_fg=MUTE)
+        self.generate_btn.set_enabled(False)
+        self.generate_btn.pack(side="right")
+
+        # ----- transcription ----- (fills the space left above the footer)
         head = Frame(root, bg=PAPER)
         head.pack(fill="x", padx=28)
         Label(head, text=self.T["transcript_head"], font=self.F["eyebrow"],
@@ -218,7 +240,7 @@ class App:
         self.words_var = StringVar(value=f"0 {self.T['words']}")
         Label(head, textvariable=self.words_var, font=self.F["eyebrow"],
               bg=PAPER, fg=MUTE).pack(side="right")
-        self.transcript = Text(root, wrap="word", height=12, bg=PAPER3,
+        self.transcript = Text(root, wrap="word", height=8, bg=PAPER3,
                                fg=INK, insertbackground=SAGE,
                                selectbackground="#DDE7E2", selectforeground=INK,
                                font=self.F["editor"], relief="flat",
@@ -230,19 +252,6 @@ class App:
         self.transcript.bind("<FocusIn>", self._clear_placeholder)
         self.transcript.bind("<FocusOut>", self._maybe_placeholder)
         self._show_placeholder()
-
-        # ----- footer -----
-        footer = Frame(root, bg=PAPER)
-        footer.pack(fill="x", padx=28, pady=14)
-        Label(footer, text=self.T["privacy_note"], font=self.F["italic"],
-              bg=PAPER, fg=MUTE).pack(side="left")
-        self.generate_btn = RoundButton(
-            footer, text=self.T["generate"], command=self.generate,
-            bg=SAGE, fg=PAPER, hover_bg=SAGE_DARK, parent_bg=PAPER,
-            font=self.F["btn"], padx=20, pady=10,
-            disabled_bg=LINE, disabled_fg=MUTE)
-        self.generate_btn.set_enabled(False)
-        self.generate_btn.pack(side="right")
 
         self._after_id = root.after(POLL_MS, self.poll)
 
